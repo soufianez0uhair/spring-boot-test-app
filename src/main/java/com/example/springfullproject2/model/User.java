@@ -5,13 +5,20 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
 @Entity
 @Table(
-        name = "users"
+        name = "users",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "user_email_unique", columnNames = "email"),
+                @UniqueConstraint(name = "user_phone_number_unique", columnNames = "phone_number"),
+        }
 )
 public class User implements UserDetails {
     // check updatable
@@ -23,6 +30,7 @@ public class User implements UserDetails {
     @NotNull(message = "First Name is required.")
     @Size(max = 30)
     @Column(
+            name = "first_name",
             nullable = false
     )
     private String firstName;
@@ -30,6 +38,7 @@ public class User implements UserDetails {
     @NotNull(message = "Last Name is required.")
     @Size(max = 30)
     @Column(
+            name = "last_name",
             nullable = false
     )
     private String lastName;
@@ -46,6 +55,7 @@ public class User implements UserDetails {
     @NotNull(message = "Phone Number is required.")
     @Size(max = 30)
     @Column(
+            name = "phone_number",
             nullable = false
     )
     private String phoneNumber;
@@ -56,6 +66,16 @@ public class User implements UserDetails {
             nullable = false
     )
     private String password;
+
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+            name = "users_roles",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "role_id"),
+            foreignKey = @ForeignKey(name = "fk_users_roles_users"),
+            inverseForeignKey = @ForeignKey(name = "fk_users_roles_roles")
+    )
+    private List<Role> roles = new ArrayList<Role>();
 
     public User() {
     }
@@ -70,6 +90,14 @@ public class User implements UserDetails {
         this.email = email;
         this.phoneNumber = phoneNumber;
         this.password = password;
+    }
+
+    public List<Role> getRoles() {
+        return roles;
+    }
+
+    public void setRoles(List<Role> roles) {
+        this.roles = roles;
     }
 
     public Long getId() {
@@ -118,7 +146,11 @@ public class User implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return null;
+        List<SimpleGrantedAuthority> authorities = new ArrayList<SimpleGrantedAuthority>();
+        for (Role role : roles) {
+            authorities.add(new SimpleGrantedAuthority(role.getAuthority()));
+        }
+        return authorities;
     }
 
     @Override
@@ -128,26 +160,40 @@ public class User implements UserDetails {
 
     @Override
     public String getUsername() {
-        return null;
+        return email;
     }
 
     @Override
     public boolean isAccountNonExpired() {
-        return false;
+        return true;
     }
 
     @Override
     public boolean isAccountNonLocked() {
-        return false;
+        return true;
     }
 
     @Override
     public boolean isCredentialsNonExpired() {
-        return false;
+        return true;
     }
 
     @Override
     public boolean isEnabled() {
-        return false;
+        return true;
+    }
+
+    public void addRole(Role role) {
+        if(roles.contains(role)) {
+            throw new IllegalArgumentException("Role already exists: " + role.getAuthority());
+        }
+        roles.add(role);
+    }
+
+    public void removeRole(Role role) {
+        if(!roles.contains(role)) {
+            throw new IllegalArgumentException("Role does not exist: " + role.getAuthority());
+        }
+        roles.remove(role);
     }
 }
